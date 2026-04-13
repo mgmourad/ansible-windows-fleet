@@ -1,0 +1,10 @@
+---
+# Default variables for dsc_integration role
+dsc_modules: []
+dsc_services: []
+
+dsc_lcm_refresh_mode: "Push"
+dsc_lcm_configuration_mode: "ApplyAndAutoCorrect"
+dsc_lcm_reboot_if_needed: false
+
+dsc_nuget_min_version: "2.8.5.201"

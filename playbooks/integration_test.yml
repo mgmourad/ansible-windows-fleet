@@ -1,0 +1,108 @@
+---
+# ============================================================
+# Integration Test Playbook: End-to-End State Validation
+# Validates that all roles produced the expected state
+# Returns PASS/FAIL for each validation check
+# Usage: ansible-playbook playbooks/integration_test.yml --ask-vault-pass
+# ============================================================
+
+- name: "Windows Fleet — Integration Tests"
+  hosts: windows
+  gather_facts: true
+  vars_files:
+    - ../group_vars/windows/vault.yml
+
+  vars:
+    test_results: []
+
+  tasks:
+    # --- Test 1: Chocolatey Installed ---
+    - name: "TEST 1: Verify Chocolatey is installed"
+      win_shell: choco --version
+      register: choco_version
+      ignore_errors: true
+      changed_when: false
+
+    - name: "RESULT 1: Chocolatey"
+      ansible.builtin.set_fact:
+        test_results: "{{ test_results + [{'test': 'Chocolatey Installed', 'result': 'PASS' if choco_version.rc == 0 else 'FAIL'}] }}"
+
+    # --- Test 2: Required Packages ---
+    - name: "TEST 2: Verify required packages are installed"
+      win_shell: choco list {{ item.name }}
+      loop:
+        - name: 7zip
+        - name: notepadplusplus
+        - name: googlechrome
+      register: package_checks
+      ignore_errors: true
+      changed_when: false
+
+    - name: "RESULT 2: Packages"
+      ansible.builtin.set_fact:
+        test_results: "{{ test_results + [{'test': 'Package: ' + item.item.name, 'result': 'PASS' if item.rc == 0 else 'FAIL'}] }}"
+      loop: "{{ package_checks.results }}"
+      # Note: In practice, you'd loop and append results
+
+    # --- Test 3: Registry Keys ---
+    - name: "TEST 3: Verify Cortana is disabled"
+      win_shell: |
+        $val = Get-ItemPropertyValue -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\Windows Search' -Name AllowCortana -ErrorAction SilentlyContinue
+        if ($val -eq 0) { Write-Output "PASS" } else { Write-Output "FAIL" }
+      register: cortana_check
+      changed_when: false
+      ignore_errors: true
+
+    - name: "RESULT 3: Cortana Disabled"
+      ansible.builtin.set_fact:
+        test_results: "{{ test_results + [{'test': 'Cortana Disabled', 'result': cortana_check.stdout | default('FAIL') | trim}] }}"
+
+    # --- Test 4: Service Account ---
+    - name: "TEST 4: Verify ansible-svc account exists"
+      win_shell: |
+        $user = Get-LocalUser -Name "ansible-svc" -ErrorAction SilentlyContinue
+        if ($user) { Write-Output "PASS" } else { Write-Output "FAIL" }
+      register: svc_check
+      changed_when: false
+      ignore_errors: true
+
+    - name: "RESULT 4: Service Account"
+      ansible.builtin.set_fact:
+        test_results: "{{ test_results + [{'test': 'ansible-svc Exists', 'result': svc_check.stdout | default('FAIL') | trim}] }}"
+
+    # --- Test 5: WinRM Service ---
+    - name: "TEST 5: Verify WinRM is running"
+      win_shell: |
+        $svc = Get-Service WinRM
+        if ($svc.Status -eq 'Running') { Write-Output "PASS" } else { Write-Output "FAIL" }
+      register: winrm_check
+      changed_when: false
+
+    - name: "RESULT 5: WinRM Running"
+      ansible.builtin.set_fact:
+        test_results: "{{ test_results + [{'test': 'WinRM Running', 'result': winrm_check.stdout | default('FAIL') | trim}] }}"
+
+    # --- Test 6: DSC LCM Configuration ---
+    - name: "TEST 6: Verify DSC LCM is in Push mode"
+      win_shell: |
+        $lcm = Get-DscLocalConfigurationManager
+        if ($lcm.RefreshMode -eq 'Push') { Write-Output "PASS" } else { Write-Output "FAIL: RefreshMode=$($lcm.RefreshMode)" }
+      register: lcm_check
+      changed_when: false
+      ignore_errors: true
+
+    - name: "RESULT 6: DSC LCM"
+      ansible.builtin.set_fact:
+        test_results: "{{ test_results + [{'test': 'DSC LCM Push Mode', 'result': lcm_check.stdout | default('FAIL') | trim}] }}"
+
+    # --- Final Report ---
+    - name: "========== INTEGRATION TEST RESULTS =========="
+      ansible.builtin.debug:
+        msg: |
+          {% for t in test_results %}
+          {{ '✅' if t.result == 'PASS' else '❌' }} {{ t.test }}: {{ t.result }}
+          {% endfor %}
+          -----------------------------------------------
+          Total: {{ test_results | length }}
+          Passed: {{ test_results | selectattr('result', 'equalto', 'PASS') | list | length }}
+          Failed: {{ test_results | rejectattr('result', 'equalto', 'PASS') | list | length }}

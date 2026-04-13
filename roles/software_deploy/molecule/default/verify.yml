@@ -1,0 +1,31 @@
+---
+# Molecule verify playbook — asserts expected state after converge
+
+- name: Verify — Assert software is installed
+  hosts: windows
+  gather_facts: false
+
+  tasks:
+    - name: Check if 7zip is installed via Chocolatey
+      win_shell: choco list --local-only 7zip
+      register: choco_7zip
+      changed_when: false
+
+    - name: Assert 7zip is present
+      ansible.builtin.assert:
+        that:
+          - "'7zip' in choco_7zip.stdout"
+        fail_msg: "7zip was NOT found in Chocolatey local packages"
+        success_msg: "✅ 7zip is installed"
+
+    - name: Check if Notepad++ is installed
+      win_shell: choco list --local-only notepadplusplus
+      register: choco_npp
+      changed_when: false
+
+    - name: Assert Notepad++ is present
+      ansible.builtin.assert:
+        that:
+          - "'notepadplusplus' in choco_npp.stdout"
+        fail_msg: "Notepad++ was NOT found in Chocolatey local packages"
+        success_msg: "✅ Notepad++ is installed"

@@ -1,0 +1,5 @@
+---
+# Default variables for registry_config role
+registry_settings: []
+registry_settings_extra: []
+registry_backup_dir: 'C:\AnsibleBackups\Registry'

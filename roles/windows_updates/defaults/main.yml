@@ -1,0 +1,12 @@
+---
+# Default variables for windows_updates role
+windows_update_category:
+  - SecurityUpdates
+  - CriticalUpdates
+
+windows_update_action: "search"  # "search" = scan only, "install" = apply
+windows_update_reboot: false
+windows_update_reboot_timeout: 600
+
+# Reject list — updates to skip (by KB number or title substring)
+windows_update_reject_list: []

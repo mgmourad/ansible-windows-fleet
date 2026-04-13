@@ -1,0 +1,54 @@
+---
+# ============================================================
+# Role: windows_updates
+# Purpose: Scan for and optionally install Windows Updates
+# ============================================================
+
+- name: Scan for available Windows Updates
+  ansible.windows.win_updates:
+    category_names: "{{ windows_update_category }}"
+    state: searched
+    reject_list: "{{ windows_update_reject_list }}"
+  register: update_scan
+  tags:
+    - updates
+    - compliance
+
+- name: Display available updates
+  ansible.builtin.debug:
+    msg: >
+      Host {{ inventory_hostname }}:
+      {{ update_scan.found_update_count | default(0) }} updates available.
+      Updates: {{ update_scan.updates | default({}) | dict2items | map(attribute='value.title') | list | join(', ') }}
+  when: update_scan.found_update_count | default(0) > 0
+  tags:
+    - updates
+    - compliance
+
+- name: Install Windows Updates (when action is 'install')
+  ansible.windows.win_updates:
+    category_names: "{{ windows_update_category }}"
+    state: installed
+    reject_list: "{{ windows_update_reject_list }}"
+    reboot: "{{ windows_update_reboot }}"
+    reboot_timeout: "{{ windows_update_reboot_timeout }}"
+  register: update_install
+  when: windows_update_action == "install"
+  notify:
+    - Schedule deferred reboot
+  tags:
+    - updates
+
+- name: Report update compliance
+  ansible.builtin.debug:
+    msg: >
+      Update compliance report for {{ inventory_hostname }}:
+      Mode: {{ windows_update_action }}.
+      Updates found: {{ update_scan.found_update_count | default(0) }}.
+      {% if windows_update_action == 'install' %}
+      Updates installed: {{ update_install.installed_update_count | default(0) }}.
+      Reboot required: {{ update_install.reboot_required | default(false) }}.
+      {% endif %}
+  tags:
+    - updates
+    - compliance

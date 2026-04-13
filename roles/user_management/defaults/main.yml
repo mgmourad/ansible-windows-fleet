@@ -1,0 +1,6 @@
+---
+# Default variables for user_management role
+local_users: []
+users_to_remove: []
+authorized_admins:
+  - Administrator

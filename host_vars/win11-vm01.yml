@@ -1,0 +1,21 @@
+---
+# Per-host overrides for win11-vm01
+# These merge with (and override) group_vars/windows/main.yml
+
+# Additional packages for this workstation
+software_packages_extra:
+  - name: firefox
+    state: present
+  - name: slack
+    state: present
+
+# This host gets a different update policy — install updates, not just scan
+windows_update_action: "install"
+windows_update_reboot: true
+
+# Custom registry settings for this specific VM
+registry_settings_extra:
+  - path: 'HKLM:\SOFTWARE\Policies\Microsoft\Edge'
+    name: HomepageLocation
+    data: "https://intranet.homelab.local"
+    type: string

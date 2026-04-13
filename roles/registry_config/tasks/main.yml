@@ -1,0 +1,89 @@
+---
+# ============================================================
+# Role: registry_config
+# Purpose: Enforce registry policies with before/after snapshots
+# ============================================================
+
+- name: Ensure registry backup directory exists
+  win_file:
+    path: "{{ registry_backup_dir }}"
+    state: directory
+  tags:
+    - registry
+
+- name: Capture BEFORE registry snapshot
+  win_shell: |
+    $timestamp = Get-Date -Format 'yyyyMMdd_HHmmss'
+    $snapshotFile = "{{ registry_backup_dir }}\before_$timestamp.json"
+    $snapshot = @{}
+    @(
+      'HKLM:\SOFTWARE\Policies\Microsoft\Windows\Windows Search',
+      'HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection',
+      'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System'
+    ) | ForEach-Object {
+      if (Test-Path $_) {
+        $snapshot[$_] = (Get-ItemProperty -Path $_ -ErrorAction SilentlyContinue | ConvertTo-Json -Depth 2)
+      }
+    }
+    $snapshot | ConvertTo-Json -Depth 3 | Out-File -FilePath $snapshotFile -Encoding UTF8
+    Write-Output $snapshotFile
+  register: before_snapshot
+  changed_when: false
+  tags:
+    - registry
+
+- name: Apply standard registry settings
+  win_regedit:
+    path: "{{ item.path }}"
+    name: "{{ item.name }}"
+    data: "{{ item.data }}"
+    type: "{{ item.type }}"
+    state: present
+  loop: "{{ registry_settings }}"
+  register: registry_results
+  tags:
+    - registry
+
+- name: Apply extra per-host registry settings
+  win_regedit:
+    path: "{{ item.path }}"
+    name: "{{ item.name }}"
+    data: "{{ item.data }}"
+    type: "{{ item.type }}"
+    state: present
+  loop: "{{ registry_settings_extra | default([]) }}"
+  when: registry_settings_extra is defined and registry_settings_extra | length > 0
+  tags:
+    - registry
+
+- name: Capture AFTER registry snapshot
+  win_shell: |
+    $timestamp = Get-Date -Format 'yyyyMMdd_HHmmss'
+    $snapshotFile = "{{ registry_backup_dir }}\after_$timestamp.json"
+    $snapshot = @{}
+    @(
+      'HKLM:\SOFTWARE\Policies\Microsoft\Windows\Windows Search',
+      'HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection',
+      'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System'
+    ) | ForEach-Object {
+      if (Test-Path $_) {
+        $snapshot[$_] = (Get-ItemProperty -Path $_ -ErrorAction SilentlyContinue | ConvertTo-Json -Depth 2)
+      }
+    }
+    $snapshot | ConvertTo-Json -Depth 3 | Out-File -FilePath $snapshotFile -Encoding UTF8
+    Write-Output $snapshotFile
+  register: after_snapshot
+  changed_when: false
+  tags:
+    - registry
+
+- name: Report registry changes applied
+  ansible.builtin.debug:
+    msg: >
+      Registry enforcement complete.
+      Standard settings: {{ registry_settings | length }} applied.
+      Extra settings: {{ registry_settings_extra | default([]) | length }} applied.
+      Before snapshot: {{ before_snapshot.stdout_lines[0] | default('N/A') }}.
+      After snapshot: {{ after_snapshot.stdout_lines[0] | default('N/A') }}.
+  tags:
+    - registry

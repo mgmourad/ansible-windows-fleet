@@ -1,0 +1,23 @@
+---
+# Handlers for windows_updates role
+# Deferred reboot via scheduled task — avoids disrupting active sessions
+
+- name: Schedule deferred reboot
+  win_shell: |
+    $taskName = "Ansible-DeferredReboot"
+    $rebootTime = (Get-Date).AddMinutes(5).ToString("HH:mm")
+
+    # Remove existing task if present
+    Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
+
+    # Create a new scheduled task for reboot
+    $action = New-ScheduledTaskAction -Execute "shutdown.exe" -Argument "/r /t 60 /c `"Ansible: Deferred reboot for Windows Updates`""
+    $trigger = New-ScheduledTaskTrigger -Once -At $rebootTime
+    $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+    $principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -RunLevel Highest
+
+    Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings -Principal $principal -Force
+
+    Write-Output "Deferred reboot scheduled at $rebootTime"
+  when: windows_update_reboot
+  listen: "Schedule deferred reboot"

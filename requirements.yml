@@ -1,0 +1,24 @@
+---
+# Ansible Galaxy collection dependencies
+# Install with: ansible-galaxy collection install -r requirements.yml
+
+collections:
+  # Microsoft Windows collection — core Windows modules
+  # Includes: win_package, win_service, win_regedit, win_user, win_updates, etc.
+  - name: ansible.windows
+    version: ">=2.1.0"
+
+  # Chocolatey collection — package management via Chocolatey
+  # Includes: win_chocolatey, win_chocolatey_config, win_chocolatey_source
+  - name: chocolatey.chocolatey
+    version: ">=1.5.1"
+
+  # Community Windows collection — extended Windows modules
+  # Includes: win_dns_record, win_domain_controller, win_firewall_rule, etc.
+  - name: community.windows
+    version: ">=2.1.0"
+
+  # Community General — utility modules used across platforms
+  # Includes: json_query filter, ini_file, etc.
+  - name: community.general
+    version: ">=8.0.0"

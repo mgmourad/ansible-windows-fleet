@@ -1,0 +1,37 @@
+# Ansible Vault password file — NEVER commit this
+.vault_pass
+.vault_pass_tmp
+.DS_Store
+# Logs
+logs/
+*.log
+
+# Docs
+docs/
+
+# Ansible facts cache
+/tmp/ansible_facts_cache/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Retry files
+*.retry
+
+# Temporary
+tmp/
+temp/

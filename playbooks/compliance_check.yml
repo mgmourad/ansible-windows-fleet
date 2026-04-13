@@ -1,0 +1,89 @@
+---
+# ============================================================
+# Read-Only Playbook: Compliance Scan
+# Reports on update status, admin audit, DSC compliance
+# NO changes are made to endpoints
+# Usage: ansible-playbook playbooks/compliance_check.yml --ask-vault-pass
+# ============================================================
+
+- name: "Windows Fleet — Compliance Scan (Read-Only)"
+  hosts: windows
+  gather_facts: true
+  vars_files:
+    - ../group_vars/windows/vault.yml
+  tasks:
+    # --- Update Compliance ---
+    - name: Scan for missing Windows Updates
+      ansible.windows.win_updates:
+        category_names:
+          - SecurityUpdates
+          - CriticalUpdates
+          - UpdateRollups
+        state: searched
+      register: update_scan
+      tags:
+        - compliance
+        - updates
+
+    - name: Report update compliance
+      ansible.builtin.debug:
+        msg: >
+          [{{ inventory_hostname }}] Updates:
+          {{ update_scan.found_update_count | default(0) }} pending.
+      tags:
+        - compliance
+
+    # --- Admin Group Audit ---
+    - name: Audit local Administrators group
+      win_shell: |
+        Get-LocalGroupMember -Group "Administrators" |
+          Select-Object -ExpandProperty Name |
+          ForEach-Object { Write-Output $_ }
+      register: admin_members
+      changed_when: false
+      tags:
+        - compliance
+        - audit
+
+    - name: Report admin group members
+      ansible.builtin.debug:
+        msg: >
+          [{{ inventory_hostname }}] Local Admins:
+          {{ admin_members.stdout_lines | join(', ') }}
+      tags:
+        - compliance
+
+    # --- DSC Compliance ---
+    - name: Check DSC configuration compliance
+      win_shell: |
+        $status = Test-DscConfiguration -Detailed -ErrorAction SilentlyContinue
+        if ($status) {
+          Write-Output "InDesiredState: $($status.InDesiredState)"
+        } else {
+          Write-Output "DSC not configured on this node"
+        }
+      register: dsc_status
+      changed_when: false
+      tags:
+        - compliance
+        - dsc
+
+    - name: Report DSC compliance
+      ansible.builtin.debug:
+        msg: "[{{ inventory_hostname }}] DSC: {{ dsc_status.stdout_lines | join(' | ') }}"
+      tags:
+        - compliance
+
+    # --- Final Summary ---
+    - name: Compliance scan complete
+      ansible.builtin.debug:
+        msg: >
+          ========================================
+          COMPLIANCE REPORT — {{ inventory_hostname }}
+          ========================================
+          Missing Updates: {{ update_scan.found_update_count | default(0) }}
+          Local Admins: {{ admin_members.stdout_lines | length }}
+          DSC Status: {{ dsc_status.stdout_lines[0] | default('Unknown') }}
+          ========================================
+      tags:
+        - compliance

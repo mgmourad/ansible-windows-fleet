@@ -1,0 +1,10 @@
+---
+# Default variables for software_deploy role
+# Override these in group_vars or host_vars
+
+software_packages: []
+software_packages_extra: []
+
+chocolatey_source: "https://community.chocolatey.org/api/v2/"
+chocolatey_allow_self_service: false
+chocolatey_cache_dir: 'C:\ProgramData\chocolatey\cache'

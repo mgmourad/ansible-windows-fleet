@@ -1,0 +1,29 @@
+# Jenkins container setup for local development
+# Usage: docker compose -f docker-compose.jenkins.yml up -d
+#
+# This runs Jenkins in Docker on your TrueNAS/Linux host.
+# Jenkins will orchestrate AWX job template launches.
+
+services:
+  jenkins:
+    image: jenkins/jenkins:lts-jdk17
+    container_name: jenkins-ansible-fleet
+    restart: unless-stopped
+    ports:
+      - "8080:8080"    # Jenkins web UI
+      - "50000:50000"  # Jenkins agent port
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock  # Docker-in-Docker for ansible-lint
+    environment:
+      - JAVA_OPTS=-Djenkins.install.runSetupWizard=true
+    networks:
+      - fleet-network
+
+networks:
+  fleet-network:
+    driver: bridge
+
+volumes:
+  jenkins_home:
+    driver: local

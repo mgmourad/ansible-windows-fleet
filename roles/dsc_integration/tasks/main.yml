@@ -1,0 +1,114 @@
+---
+# ============================================================
+# Role: dsc_integration
+# Purpose: Configure PowerShell DSC — NuGet, PSGallery, modules, LCM, services
+# ============================================================
+
+# Step 1: Ensure NuGet provider is installed
+- name: Install NuGet package provider
+  win_shell: |
+    $nuget = Get-PackageProvider -Name NuGet -ErrorAction SilentlyContinue
+    if (-not $nuget -or $nuget.Version -lt [version]"{{ dsc_nuget_min_version }}") {
+      Install-PackageProvider -Name NuGet -MinimumVersion "{{ dsc_nuget_min_version }}" -Force -Scope AllUsers
+      Write-Output "NuGet provider installed/updated"
+    } else {
+      Write-Output "NuGet provider already at version $($nuget.Version)"
+    }
+  register: nuget_result
+  changed_when: "'installed/updated' in nuget_result.stdout"
+  tags:
+    - dsc
+
+# Step 2: Configure PSGallery as trusted repository
+- name: Set PSGallery as trusted repository
+  win_shell: |
+    $repo = Get-PSRepository -Name PSGallery -ErrorAction SilentlyContinue
+    if ($repo.InstallationPolicy -ne 'Trusted') {
+      Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+      Write-Output "PSGallery set to Trusted"
+    } else {
+      Write-Output "PSGallery already Trusted"
+    }
+  register: psgallery_result
+  changed_when: "'set to Trusted' in psgallery_result.stdout"
+  tags:
+    - dsc
+
+# Step 3: Install required DSC modules
+- name: Install DSC modules from PSGallery
+  win_shell: |
+    $moduleName = "{{ item.name }}"
+    $requiredVersion = "{{ item.version }}"
+    $installed = Get-Module -Name $moduleName -ListAvailable | Where-Object { $_.Version -eq $requiredVersion }
+    if (-not $installed) {
+      Install-Module -Name $moduleName -RequiredVersion $requiredVersion -Force -AllowClobber -Scope AllUsers
+      Write-Output "Installed $moduleName v$requiredVersion"
+    } else {
+      Write-Output "$moduleName v$requiredVersion already installed"
+    }
+  loop: "{{ dsc_modules }}"
+  register: dsc_module_results
+  changed_when: "'Installed' in item.stdout | default('')"
+  tags:
+    - dsc
+
+# Step 4: Configure Local Configuration Manager (LCM)
+- name: Configure DSC Local Configuration Manager
+  win_shell: |
+    [DSCLocalConfigurationManager()]
+    Configuration LCMConfig {
+      Node localhost {
+        Settings {
+          RefreshMode          = "{{ dsc_lcm_refresh_mode }}"
+          ConfigurationMode    = "{{ dsc_lcm_configuration_mode }}"
+          RebootNodeIfNeeded   = ${{ dsc_lcm_reboot_if_needed | lower }}
+          ActionAfterReboot    = "ContinueConfiguration"
+          RefreshFrequencyMins = 30
+        }
+      }
+    }
+
+    $outputPath = "C:\Windows\Temp\LCMConfig"
+    LCMConfig -OutputPath $outputPath
+    Set-DscLocalConfigurationManager -Path $outputPath -Verbose -Force
+    Write-Output "LCM configured: Mode={{ dsc_lcm_configuration_mode }}, Refresh={{ dsc_lcm_refresh_mode }}"
+  register: lcm_result
+  changed_when: "'LCM configured' in lcm_result.stdout"
+  tags:
+    - dsc
+
+# Step 5: Enforce service states via DSC
+- name: Enforce service state via DSC
+  win_dsc:
+    resource_name: Service
+    Name: "{{ item.name }}"
+    State: "{{ item.state }}"
+    StartupType: "{{ item.startup_type }}"
+  loop: "{{ dsc_services }}"
+  register: dsc_service_results
+  tags:
+    - dsc
+    - services
+
+# Step 6: DSC compliance check
+- name: Check DSC compliance status
+  win_shell: |
+    $status = Test-DscConfiguration -Detailed
+    $result = @{
+      InDesiredState = $status.InDesiredState
+      ResourcesInDesiredState = ($status.ResourcesInDesiredState | Measure-Object).Count
+      ResourcesNotInDesiredState = ($status.ResourcesNotInDesiredState | Measure-Object).Count
+    }
+    $result | ConvertTo-Json
+  register: dsc_compliance
+  changed_when: false
+  tags:
+    - dsc
+    - compliance
+
+- name: Report DSC compliance
+  ansible.builtin.debug:
+    msg: "DSC Compliance: {{ dsc_compliance.stdout }}"
+  tags:
+    - dsc
+    - compliance

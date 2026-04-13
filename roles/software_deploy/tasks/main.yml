@@ -1,0 +1,58 @@
+---
+# ============================================================
+# Role: software_deploy
+# Purpose: Install Chocolatey and deploy packages to Windows endpoints
+# ============================================================
+
+- name: Ensure Chocolatey is installed
+  win_chocolatey:
+    name: chocolatey
+    state: present
+  register: choco_install
+  tags:
+    - chocolatey
+    - software
+
+- name: Display Chocolatey installation result
+  ansible.builtin.debug:
+    msg: "Chocolatey install status: {{ 'Installed' if choco_install.changed else 'Already present' }}"
+  tags:
+    - chocolatey
+
+- name: Configure Chocolatey source
+  win_chocolatey_source:
+    name: chocolatey
+    source: "{{ chocolatey_source }}"
+    state: present
+  tags:
+    - chocolatey
+
+- name: Deploy standard software packages
+  win_chocolatey:
+    name: "{{ item.name }}"
+    state: "{{ item.state | default('present') }}"
+    version: "{{ item.version | default(omit) }}"
+  loop: "{{ software_packages }}"
+  register: software_results
+  tags:
+    - software
+
+- name: Deploy extra per-host software packages
+  win_chocolatey:
+    name: "{{ item.name }}"
+    state: "{{ item.state | default('present') }}"
+    version: "{{ item.version | default(omit) }}"
+  loop: "{{ software_packages_extra | default([]) }}"
+  register: extra_software_results
+  when: software_packages_extra is defined and software_packages_extra | length > 0
+  tags:
+    - software
+
+- name: Log software deployment summary
+  ansible.builtin.debug:
+    msg: >
+      Software deployment complete.
+      Standard packages processed: {{ software_packages | length }}.
+      Extra packages processed: {{ software_packages_extra | default([]) | length }}.
+  tags:
+    - software

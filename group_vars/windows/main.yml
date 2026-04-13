@@ -1,0 +1,134 @@
+---
+# ============================================================
+# Windows-specific variables
+# Applied to all hosts in the [windows] group
+# ============================================================
+
+# ----------------------------------------------------------
+# 📦 SOFTWARE DEPLOYMENT (Chocolatey)
+# ----------------------------------------------------------
+# Packages to install on all Windows endpoints
+# Each entry: { name: <choco-package>, version: <optional> }
+software_packages:
+  - name: googlechrome
+    state: present
+  - name: 7zip
+    state: present
+  - name: notepadplusplus
+    state: present
+  - name: vscode
+    state: present
+  - name: git
+    state: present
+
+# Chocolatey source configuration
+chocolatey_source: "https://community.chocolatey.org/api/v2/"
+chocolatey_allow_self_service: false
+
+# ----------------------------------------------------------
+# 🔑 REGISTRY CONFIGURATION
+# ----------------------------------------------------------
+# Registry keys to enforce across the fleet
+# Each entry: { path, name, data, type }
+registry_settings:
+  # Disable Cortana
+  - path: 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\Windows Search'
+    name: AllowCortana
+    data: 0
+    type: dword
+
+  # Disable telemetry (Enterprise)
+  - path: 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection'
+    name: AllowTelemetry
+    data: 0
+    type: dword
+
+  # Show file extensions in Explorer
+  - path: 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
+    name: HideFileExt
+    data: 0
+    type: dword
+
+  # Disable first-run animations
+  - path: 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System'
+    name: EnableFirstLogonAnimation
+    data: 0
+    type: dword
+
+# ----------------------------------------------------------
+# 👤 USER MANAGEMENT
+# ----------------------------------------------------------
+# Local users to create/manage
+local_users:
+  - name: ansible-svc
+    fullname: "Ansible Service Account"
+    groups:
+      - Administrators
+    state: present
+    # Password stored in vault.yml as vault_ansible_svc_password
+
+  - name: monitoring-svc
+    fullname: "Monitoring Service Account"
+    groups:
+      - "Performance Monitor Users"
+      - "Event Log Readers"
+    state: present
+
+# Users to ensure are REMOVED (cleanup)
+users_to_remove:
+  - name: TempAdmin
+    state: absent
+
+# Admin group audit — only these users should be in local Administrators
+authorized_admins:
+  - Administrator
+  - ansible-svc
+
+# ----------------------------------------------------------
+# 🔄 WINDOWS UPDATES
+# ----------------------------------------------------------
+# Update compliance settings
+windows_update_category:
+  - SecurityUpdates
+  - CriticalUpdates
+  - UpdateRollups
+
+# Action: "search" = scan only, "install" = scan + install
+windows_update_action: "search"
+
+# Reboot policy
+windows_update_reboot: false
+windows_update_reboot_timeout: 600
+
+# Maintenance window (used for scheduling in AWX)
+maintenance_window_start: "02:00"
+maintenance_window_end: "06:00"
+
+# ----------------------------------------------------------
+# ⚙️ DSC (Desired State Configuration)
+# ----------------------------------------------------------
+# DSC modules to install from PSGallery
+dsc_modules:
+  - name: xPSDesiredStateConfiguration
+    version: "9.1.0"
+  - name: NetworkingDsc
+    version: "9.0.0"
+  - name: ComputerManagementDsc
+    version: "9.0.0"
+
+# Services to enforce via DSC
+dsc_services:
+  - name: W32Time
+    state: Running
+    startup_type: Automatic
+  - name: WinRM
+    state: Running
+    startup_type: Automatic
+  - name: WinDefend
+    state: Running
+    startup_type: Automatic
+
+# LCM (Local Configuration Manager) settings
+dsc_lcm_refresh_mode: "Push"
+dsc_lcm_configuration_mode: "ApplyAndAutoCorrect"
+dsc_lcm_reboot_if_needed: false

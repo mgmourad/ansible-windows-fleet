@@ -1,0 +1,16 @@
+---
+# Molecule converge playbook — applies the role with test variables
+
+- name: Converge — Test software_deploy role
+  hosts: windows
+  gather_facts: true
+
+  vars:
+    software_packages:
+      - name: 7zip
+        state: present
+      - name: notepadplusplus
+        state: present
+
+  roles:
+    - role: software_deploy

@@ -1,0 +1,41 @@
+---
+# ============================================================
+# Master Playbook: Full Fleet Enforcement
+# Applies ALL roles to all Windows endpoints
+# Usage: ansible-playbook playbooks/site.yml --ask-vault-pass
+# Dry run: ansible-playbook playbooks/site.yml --check --ask-vault-pass
+# ============================================================
+
+- name: "Windows Fleet — Full Configuration Enforcement"
+  hosts: windows
+  gather_facts: true
+  vars_files:
+    - ../group_vars/windows/vault.yml
+
+  pre_tasks:
+    - name: Display target host information
+      ansible.builtin.debug:
+        msg: >
+          Enforcing fleet configuration on {{ inventory_hostname }}
+          ({{ ansible_host }}).
+          OS: {{ ansible_os_name | default('Unknown') }}.
+          Timestamp: {{ ansible_date_time.iso8601 | default('N/A') }}.
+
+  roles:
+    - role: software_deploy
+      tags: [software]
+    - role: registry_config
+      tags: [registry]
+    - role: user_management
+      tags: [users]
+    - role: windows_updates
+      tags: [updates]
+    - role: dsc_integration
+      tags: [dsc]
+
+  post_tasks:
+    - name: Fleet enforcement summary
+      ansible.builtin.debug:
+        msg: >
+          ✅ Fleet enforcement complete on {{ inventory_hostname }}.
+          All roles applied successfully.

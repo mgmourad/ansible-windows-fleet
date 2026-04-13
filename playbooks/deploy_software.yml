@@ -1,0 +1,13 @@
+---
+# ============================================================
+# Targeted Playbook: Software Deployment Only
+# Usage: ansible-playbook playbooks/deploy_software.yml --ask-vault-pass
+# ============================================================
+
+- name: "Windows Fleet — Software Deployment"
+  hosts: windows
+  gather_facts: false
+
+  roles:
+    - role: software_deploy
+      tags: [software]

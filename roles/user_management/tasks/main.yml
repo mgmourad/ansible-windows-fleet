@@ -1,0 +1,56 @@
+---
+# ============================================================
+# Role: user_management
+# Purpose: Create/remove local users, manage group membership, audit admins
+# ============================================================
+
+- name: Create or update local users
+  ansible.windows.win_user:
+    name: "{{ item.name }}"
+    fullname: "{{ item.fullname | default(omit) }}"
+    password: "{{ lookup('vars', 'vault_' + item.name | replace('-', '_') + '_password', default=omit) }}"
+    groups: "{{ item.groups | default(omit) }}"
+    state: "{{ item.state | default('present') }}"
+    password_never_expires: true
+    user_cannot_change_password: true
+    account_disabled: false
+  loop: "{{ local_users }}"
+  register: user_create_results
+  tags:
+    - users
+
+- name: Remove unauthorized users
+  ansible.windows.win_user:
+    name: "{{ item.name }}"
+    state: absent
+  loop: "{{ users_to_remove }}"
+  register: user_remove_results
+  tags:
+    - users
+
+- name: Audit local Administrators group
+  ansible.windows.win_shell: >-
+    Get-LocalGroupMember -Group 'Administrators' |
+    Select-Object -ExpandProperty Name |
+    ConvertTo-Json
+  register: admin_audit
+  changed_when: false
+  tags:
+    - users
+    - audit
+
+- name: Report admin group members
+  ansible.builtin.debug:
+    msg: "Local Administrators on {{ inventory_hostname }}: {{ admin_audit.stdout }}"
+  tags:
+    - users
+    - audit
+
+- name: Report user management summary
+  ansible.builtin.debug:
+    msg: >
+      User management complete on {{ inventory_hostname }}.
+      Users created/updated: {{ local_users | length }}.
+      Users removed: {{ users_to_remove | length }}.
+  tags:
+    - users

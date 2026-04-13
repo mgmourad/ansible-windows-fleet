@@ -1,0 +1,19 @@
+---
+# Variables that apply to ALL hosts (Linux and Windows)
+# Environment-agnostic settings
+
+# Organization info (used in naming, tagging, compliance reports)
+org_name: "HomeLabOps"
+project_name: "ansible-windows-fleet"
+environment_name: "dev"
+
+# Logging
+ansible_log_path: "logs/ansible_{{ lookup('pipe', 'date +%Y%m%d_%H%M%S') }}.log"
+
+# Compliance report settings
+compliance_report_dir: "/tmp/fleet_compliance_reports"
+compliance_report_format: "html"
+
+# Notification settings (extensible — Slack, email, etc.)
+notify_on_failure: true
+notify_on_compliance_drift: true

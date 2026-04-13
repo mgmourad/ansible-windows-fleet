@@ -1,0 +1,40 @@
+---
+# Molecule test configuration for software_deploy role
+# Uses delegated driver — tests run against real Windows VMs
+# (Molecule can't spin up Windows containers natively)
+
+dependency:
+  name: galaxy
+  options:
+    requirements-file: ../../../../requirements.yml
+
+driver:
+  name: delegated
+  options:
+    managed: false
+    ansible_connection_options:
+      ansible_connection: winrm
+      ansible_port: 5986
+      ansible_winrm_transport: ntlm
+      ansible_winrm_server_cert_validation: ignore
+
+platforms:
+  - name: win11-vm01
+    groups:
+      - windows
+
+provisioner:
+  name: ansible
+  inventory:
+    hosts:
+      all:
+        children:
+          windows:
+            hosts:
+              win11-vm01:
+                ansible_host: 192.168.1.101
+                ansible_user: ansible-admin
+                ansible_password: "${MOLECULE_WINRM_PASSWORD}"
+
+verifier:
+  name: ansible
