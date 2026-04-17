@@ -7,6 +7,10 @@
 //   - AWX job templates configured and named correctly
 //   - Network connectivity between Jenkins and AWX
 
+properties([
+    [$class: 'RebuildSettings', autoRebuild: false, rebuildDisabled: false],
+])
+
 pipeline {
     agent any
 
