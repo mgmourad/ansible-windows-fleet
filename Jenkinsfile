@@ -7,9 +7,6 @@
 //   - AWX job templates configured and named correctly
 //   - Network connectivity between Jenkins and AWX
 
-properties([
-    [$class: 'RebuildSettings', autoRebuild: false, rebuildDisabled: false],
-])
 
 pipeline {
     agent any
@@ -33,7 +30,7 @@ pipeline {
     }
 
     environment {
-        AWX_URL       = 'http://192.168.1.198:30080/#/jobs'
+        AWX_URL       = 'http://192.168.1.198:30080'
         AWX_CRED_ID   = 'awx-api-token'
     }
 
@@ -71,6 +68,7 @@ pipeline {
             steps {
                 withCredentials([string(credentialsId: "${AWX_CRED_ID}", variable: 'AWX_TOKEN')]) {
                     script {
+                        def authValue = "Bearer " + AWX_TOKEN
                         def jobTemplateName = "fleet-${params.PLAYBOOK}-${params.ENVIRONMENT}"
                         def extraVars = params.DRY_RUN ? '{"ansible_check_mode": true}' : '{}'
 
@@ -80,7 +78,7 @@ pipeline {
                             url: "${AWX_URL}/api/v2/job_templates/${jobTemplateName}/launch/",
                             httpMode: 'POST',
                             customHeaders: [
-                                [name: 'Authorization', value: "Bearer ${AWX_TOKEN}"],
+                                [name: 'Authorization', value: authValue],
                                 [name: 'Content-Type',  value: 'application/json']
                             ],
                             requestBody: """{"extra_vars": ${extraVars}}""",
@@ -99,6 +97,7 @@ pipeline {
             steps {
                 withCredentials([string(credentialsId: "${AWX_CRED_ID}", variable: 'AWX_TOKEN')]) {
                     script {
+                        def authValue = "Bearer " + AWX_TOKEN
                         def jobComplete = false
                         def maxRetries = 60
                         def retryCount = 0
@@ -110,7 +109,7 @@ pipeline {
                                 url: "${AWX_URL}/api/v2/jobs/${env.AWX_JOB_ID}/",
                                 httpMode: 'GET',
                                 customHeaders: [
-                                    [name: 'Authorization', value: "Bearer ${AWX_TOKEN}"]
+                                    [name: 'Authorization', value: authValue]
                                 ],
                                 validResponseCodes: '200'
                             )
