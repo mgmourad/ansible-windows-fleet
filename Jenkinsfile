@@ -29,7 +29,7 @@ pipeline {
     }
 
     environment {
-        AWX_URL       = 'http://awx.homelab.local:8052'
+        AWX_URL       = 'http://192.168.1.198:30080/#/jobs'
         AWX_CRED_ID   = 'awx-api-token'
     }
 
